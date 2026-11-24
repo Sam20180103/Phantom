@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Phantom</title>
+    <style>
+      :root { color-scheme: dark; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0; min-height: 100dvh;
+        display: grid; place-items: center;
+        background: #0a0a0a; color: #e8e8e8;
+        font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, sans-serif;
+      }
+      form { width: min(22rem, calc(100vw - 3rem)); }
+      h1 { margin: 0 0 .25rem; font-size: 1.5rem; letter-spacing: -.01em; }
+      p { margin: 0 0 1.5rem; color: #8a8a8a; font-size: .875rem; }
+      label { display: block; margin-bottom: .5rem; font-size: .8125rem; color: #b4b4b4; }
+      input, button {
+        width: 100%; font: inherit; border-radius: .5rem;
+        /* 48px min target: this is the one page a phone user must get through. */
+        min-height: 3rem; padding: 0 .875rem;
+      }
+      input {
+        background: #141414; color: #e8e8e8;
+        border: 1px solid #2a2a2a; margin-bottom: .75rem;
+      }
+      input:focus { outline: 2px solid #4a9eff; outline-offset: -1px; border-color: transparent; }
+      button { background: #4a9eff; color: #001427; border: 0; font-weight: 600; cursor: pointer; }
+      button:hover { background: #6badff; }
+      .err { color: #ff6b6b; font-size: .8125rem; margin-bottom: .75rem; }
+    </style>
+  </head>
+  <body>
+    <form method="post" action="/login">
+      <h1>Phantom</h1>
+      <p>Sign in to continue.</p>
+      <label for="username">Username</label>
+      <input id="username" name="username" type="text" autocomplete="username"
+             autocapitalize="none" autocorrect="off" spellcheck="false" autofocus />
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password"
+             required />
+      <button type="submit">Sign in</button>
+    </form>
+  </body>
+</html>

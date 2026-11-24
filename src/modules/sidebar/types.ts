@@ -1,0 +1,5 @@
+export type SidebarViewId =
+  | "explorer"
+  | "source-control"
+  | "agents"
+  | "room";

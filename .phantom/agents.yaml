@@ -1,0 +1,18 @@
+agents:
+  claude:
+    cmd: claude
+    role: 后端 + Python AI 引擎
+  agy:
+    cmd: agy
+    role: 前端
+  opencode:
+    cmd: opencode
+    role: playwright 单元测试
+handoff_dir: .phantom/handoff
+
+# The orchestrator brain (step 5). endpoint defaults to GLM's OpenAI-compatible
+# endpoint when omitted; set `model` to the id your key serves. The API key is a
+# secret, not stored here: set it via the secret `orchestrator/apiKey`, or the
+# env var PHANTOM_ORCHESTRATOR_KEY on the server.
+orchestrator:
+  model: glm-5.2

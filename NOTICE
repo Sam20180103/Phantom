@@ -1,0 +1,30 @@
+Phantom
+
+Phantom contains software derived from Terax (crynta/terax-ai) and its
+contributors. The integration baseline is Terax v0.9.0:
+https://github.com/crynta/terax-ai/tree/v0.9.0
+
+Phantom modifies the upstream project with a shared Rust core, a headless
+browser and WebSocket gateway, persistent remote terminals, and Room-based
+agent collaboration. See LICENSE for the Apache License, Version 2.0.
+
+Bundled terminal components retain their upstream MIT notices:
+
+- Coder's ghostty-web (legacy compatibility bridge):
+  https://github.com/coder/ghostty-web
+  packages/ghostty-core/LICENSE
+
+- Ghostty, by Mitchell Hashimoto and the Ghostty contributors
+  (adapted core and official ABI evaluation artifact):
+  https://github.com/ghostty-org/ghostty
+  packages/ghostty-core/adapted/LICENSE.ghostty
+
+- Restty, by Wiedy Mi (selected low-level bridge code):
+  https://github.com/wiedymi/restty
+  packages/ghostty-core/adapted/LICENSE.restty
+
+- xterm.js and its predecessors (adapted WebGL renderer):
+  https://github.com/xtermjs/xterm.js
+  src/modules/terminal/ghostty/webgl/LICENSE.xterm-js
+
+Other dependencies are distributed under their respective licenses.

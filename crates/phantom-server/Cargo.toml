@@ -1,0 +1,48 @@
+[package]
+name = "phantom-server"
+description = "Headless WebSocket gateway for Phantom"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+phantom-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+log.workspace = true
+
+axum = { version = "0.8", features = ["ws"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "sync", "fs", "io-util"] }
+# Streams an open file into a response body, so a download never buffers the
+# whole file in memory. Already in the tree via tower/reqwest.
+tokio-util = { version = "0.7", features = ["io"] }
+tower-http = { version = "0.6", features = ["fs", "trace", "compression-gzip", "compression-br"] }
+env_logger = "0.11"
+futures-util = "0.3"
+axum-server = { version = "0.7", features = ["tls-rustls"] }
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
+serde_yaml = "0.9"
+# Orchestrator brain calls (GLM/OpenAI-compatible). rustls to match the rest of
+# the TLS stack; json for the request/response bodies.
+reqwest = { version = "0.12", default-features = false, features = [
+	"rustls-tls",
+	"json",
+] }
+# Outbound WebSocket for the peer link (a peer server dials the hub). Already
+# in the tree as axum's ws implementation; native roots so a mesh's own CA can
+# be trusted by installing it in the system store rather than via a flag.
+tokio-tungstenite = { version = "0.29", features = [
+	"rustls-tls-native-roots",
+] }
+# Trusting a hub's self-signed certificate on the peer link. Both were already
+# in the tree through reqwest/rustls; named here because this crate uses them.
+rustls-pemfile = "2"
+rustls-native-certs = "0.8"
+subtle = "2"
+getrandom = "0.3"
+dirs.workspace = true
+# Not published to crates.io; pinned by revision so builds stay reproducible.
+rmux-sdk = { git = "https://github.com/helvesec/rmux", rev = "b9b6b86e87792ad28bcdb3815ff08cce22400bb1" }
+
+[dev-dependencies]
+tempfile = "3"

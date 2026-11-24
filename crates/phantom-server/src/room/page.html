@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Phantom Room</title>
+<style>
+  :root {
+    --bg: #fafaf8; --fg: #1c1c1a; --muted: #6d6c66; --line: #e3e2dc;
+    --bubble: #eeede8; --accent: #3a63d8; --ok: #1f9d55; --busy: #d49713;
+    --wait: #e0701f; --bad: #cf3f36; --off: #a5a49d;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161614; --fg: #ebeae4; --muted: #9b9a93; --line: #2b2a27;
+      --bubble: #252422; --accent: #7d9cff; --off: #5d5c57;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", sans-serif;
+    display: flex; flex-direction: column; height: 100dvh;
+  }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  header {
+    display: flex; align-items: center; gap: 8px;
+    padding: max(10px, env(safe-area-inset-top)) 16px 10px;
+    border-bottom: 1px solid var(--line);
+  }
+  header strong { font-size: 16px; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .grow { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--off); flex: none; }
+  .dot.ok { background: var(--ok); }
+  .dot.busy { background: var(--busy); }
+  .dot.wait { background: var(--wait); }
+  .dot.bad { background: var(--bad); }
+  .link { background: none; border: 0; padding: 4px 0; color: var(--muted); font-size: 13px; }
+
+  #chips {
+    display: flex; gap: 6px; padding: 8px 16px; overflow-x: auto;
+    border-bottom: 1px solid var(--line); scrollbar-width: none;
+  }
+  #chips:empty { display: none; }
+  .chip {
+    display: flex; align-items: center; gap: 6px; flex: none;
+    border: 1px solid var(--line); border-radius: 999px; background: none;
+    padding: 4px 10px; font-size: 13px;
+  }
+  .chip .peer { color: var(--muted); }
+
+  #log { flex: 1; overflow-y: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; }
+  .msg { display: flex; flex-direction: column; gap: 2px; max-width: 88%; }
+  .msg .who { font-size: 12px; color: var(--muted); }
+  .msg .text { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .msg.mine { align-self: flex-end; align-items: flex-end; }
+  .msg.mine .text { background: var(--bubble); border-radius: 16px 16px 4px 16px; padding: 8px 12px; }
+  .msg .refs { font-size: 12px; color: var(--muted); }
+  .notice { align-self: center; max-width: 92%; text-align: center; font-size: 12px; color: var(--muted); }
+  #busy { margin: 0; padding: 4px 16px; font-size: 12px; color: var(--muted); }
+  .peek { background: none; border: 0; padding: 0; font: inherit; color: inherit; text-decoration: underline dotted; text-underline-offset: 2px; }
+  #screen { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  #screen .head { display: flex; align-items: center; gap: 8px; padding: 6px 16px; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+  #screen pre { flex: 1; min-height: 0; overflow: auto; margin: 0; padding: 8px 16px; font: 12px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre; }
+  .empty { margin: auto; text-align: center; color: var(--muted); padding: 24px; }
+
+  form { margin: 0; }
+  #composer { border-top: 1px solid var(--line); padding: 8px 16px max(8px, env(safe-area-inset-bottom)); }
+  #composer .row { display: flex; gap: 8px; align-items: flex-end; }
+  textarea, input {
+    font: inherit; font-size: 16px; /* under 16px iOS zooms in on focus */
+    color: var(--fg); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; width: 100%;
+  }
+  textarea { resize: none; max-height: 40vh; field-sizing: content; min-height: 40px; }
+  textarea:focus, input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .primary {
+    flex: none; border: 0; border-radius: 10px; padding: 9px 14px;
+    background: var(--accent); color: #fff; font-weight: 600;
+  }
+  .primary:disabled { opacity: .45; cursor: default; }
+  .error { color: var(--bad); font-size: 13px; margin: 0 0 6px; }
+  .icon {
+    flex: none; border: 1px solid var(--line); border-radius: 10px; background: none;
+    width: 40px; height: 40px; font-size: 18px; line-height: 1;
+  }
+  #attached { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 6px; }
+  #attached:empty { display: none; }
+  #attached button { border: 1px solid var(--line); border-radius: 8px; background: none; padding: 2px 8px; font-size: 13px; }
+
+  #gate { margin: auto; width: min(420px, 100% - 32px); display: flex; flex-direction: column; gap: 12px; padding: 24px 0; }
+  #gate h1 { font-size: 20px; margin: 0; }
+  #gate p { margin: 0; color: var(--muted); font-size: 14px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <span id="status" class="dot" title="offline"></span>
+  <strong>Room</strong>
+  <span id="room" class="muted grow"></span>
+  <button id="signout" class="link" type="button" hidden>Sign out</button>
+</header>
+
+<form id="gate" hidden>
+  <h1>Join the room</h1>
+  <p>Paste the room token this server's owner gave you (<code>room.client-tokens</code>).
+     It reaches the room only — not a shell, not files.</p>
+  <input id="token" type="password" autocomplete="off" spellcheck="false" placeholder="room token" required>
+  <p id="gate-error" class="error" role="alert" hidden></p>
+  <button class="primary" type="submit">Join</button>
+</form>
+
+<nav id="chips" aria-label="Who you can mention" hidden></nav>
+<main id="log" aria-live="polite" hidden></main>
+<section id="screen" aria-label="An agent's screen" hidden>
+  <div class="head"><span id="screen-title" class="grow"></span><button id="screen-close" class="link" type="button">Close</button></div>
+  <pre id="screen-text"></pre>
+</section>
+<p id="busy" role="status" hidden></p>
+
+<form id="composer" hidden>
+  <p id="send-error" class="error" role="alert" hidden></p>
+  <div id="attached" aria-label="Attached files"></div>
+  <div class="row">
+    <button id="attach" class="icon" type="button" title="Attach a text file" aria-label="Attach a text file">📎</button>
+    <input id="files" type="file" multiple hidden
+      accept="text/*,.md,.txt,.log,.json,.csv,.yaml,.yml,.toml,.ini,.xml,.html,.css,.js,.ts,.py,.rs,.go,.java,.c,.h,.cpp,.sh,.sql">
+    <textarea id="text" rows="1" placeholder="Message — @name hands it work" aria-label="Message"></textarea>
+    <button id="send" class="primary" type="submit" disabled>Send</button>
+  </div>
+</form>
+
+<script>
+"use strict";
+// The room, for a device that has nothing but a browser: a room-only client
+// token (never the login password, which reaches a shell) over /room/client.
+// Everything a message says is rendered with textContent — never as HTML.
+
+const TOKEN_KEY = "phantom-room-token";
+const INVOKE_TIMEOUT_MS = 15000;
+// Silence after which the connection is replaced. Pings are invisible to a
+// page, so the server sends a keepalive it can see; a phone that slept wakes to
+// a socket that looks open and hears nothing, and would otherwise stay there.
+const SILENCE_MS = 60000;
+// The server's own limits: a message is at most 8 KiB, an attachment 64 KiB.
+const MAX_MESSAGE_BYTES = 8000;
+const MAX_ATTACHMENT_BYTES = 64 * 1024;
+const MAX_ATTACHMENTS = 4;
+const bytes = (text) => new TextEncoder().encode(text).length;
+let attached = []; // [{ name, text }] waiting for the next send
+const ROSTER_EVERY_MS = 15000;
+// After you hand someone work, watch closely for a while: the point is to see
+// them pick it up, not to learn about it a quarter of a minute later.
+const ROSTER_FAST_MS = 3000;
+const PEEK_EVERY_MS = 3000;
+let peekTimer = null;
+const FAST_FOR_MS = 90000;
+let fastUntil = 0;
+const $ = (id) => document.getElementById(id);
+
+const saved = {
+  get() { try { return localStorage.getItem(TOKEN_KEY); } catch { return null; } },
+  set(v) { try { localStorage.setItem(TOKEN_KEY, v); } catch {} },
+  clear() { try { localStorage.removeItem(TOKEN_KEY); } catch {} },
+};
+
+let socket = null;
+let token = null;
+let nextReq = 1;
+const pending = new Map();
+const messages = new Map(); // seq → message
+let localPeer = "";
+// Which log the held messages belong to. Numbers start again when a log does,
+// so messages from a replaced log must be dropped, not merged with the new.
+let epoch = null;
+let backoff = 1000;
+let rosterTimer = null;
+let retryTimer = null;
+
+function setStatus(kind, label) {
+  $("status").className = "dot" + (kind ? " " + kind : "");
+  $("status").title = label;
+}
+
+function show(view) {
+  const joined = view === "room";
+  $("gate").hidden = joined;
+  $("log").hidden = !joined || !$("screen").hidden;
+  $("composer").hidden = !joined;
+  $("chips").hidden = !joined;
+  $("signout").hidden = !joined;
+}
+
+function askForToken(error) {
+  show("gate");
+  setStatus("", "signed out");
+  $("gate-error").textContent = error || "";
+  $("gate-error").hidden = !error;
+  $("token").focus();
+}
+
+function connect() {
+  clearTimeout(retryTimer);
+  // At most one connection: joining again (a new token) retires the old one.
+  const previous = socket;
+  socket = null;
+  previous?.close();
+  token = saved.get();
+  if (!token) return askForToken();
+  const url = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/room/client";
+  const s = new WebSocket(url);
+  socket = s;
+  let opened = false;
+  let ready = false;
+  // Only once a keepalive has been seen: a server too old to send them would
+  // otherwise look dead every quiet minute.
+  let heard = Date.now();
+  let keepsAlive = false;
+  const watchdog = setInterval(() => {
+    if (keepsAlive && Date.now() - heard > SILENCE_MS) s.close();
+  }, SILENCE_MS / 6);
+  setStatus("", "connecting…");
+
+  s.onopen = () => {
+    opened = true;
+    s.send(JSON.stringify({ type: "auth", token }));
+  };
+  s.onmessage = (event) => {
+    heard = Date.now();
+    let m;
+    try { m = JSON.parse(event.data); } catch { return; }
+    if (m.type === "keepalive") {
+      keepsAlive = true;
+    } else if (m.type === "ready") {
+      ready = true;
+      backoff = 1000;
+      setStatus("ok", "connected");
+      show("room");
+      refill();
+      pollRoster();
+    } else if (m.type === "result") {
+      const p = pending.get(m.req);
+      if (!p) return;
+      pending.delete(m.req);
+      clearTimeout(p.timer);
+      if (m.err !== undefined) p.reject(new Error(m.err));
+      else p.resolve(m.ok);
+    } else if (m.type === "event" && m.event === "room:event") {
+      const p = m.payload;
+      if (p.kind !== "message") refill(); // fell behind the buffer: fetch what was missed
+      else if (p.epoch && epoch && p.epoch !== epoch) refill(); // another log: start over
+      else add([p.message]);
+    }
+  };
+  s.onclose = () => {
+    clearInterval(watchdog);
+    if (socket !== s) return; // replaced, or signed out
+    socket = null;
+    clearTimeout(rosterTimer);
+    for (const p of pending.values()) { clearTimeout(p.timer); p.reject(new Error("connection lost")); }
+    pending.clear();
+    // Opened, authenticated, and closed without a word: the token was refused.
+    if (opened && !ready) {
+      saved.clear();
+      return askForToken("That token was not accepted.");
+    }
+    setStatus("bad", "offline — reconnecting");
+    retryTimer = setTimeout(connect, backoff);
+    backoff = Math.min(backoff * 2, 30000);
+  };
+}
+
+function invoke(cmd, args) {
+  const s = socket;
+  if (!s || s.readyState !== WebSocket.OPEN) return Promise.reject(new Error("not connected"));
+  return new Promise((resolve, reject) => {
+    const req = nextReq++;
+    const timer = setTimeout(() => { pending.delete(req); reject(new Error("the room did not answer")); }, INVOKE_TIMEOUT_MS);
+    pending.set(req, { resolve, reject, timer });
+    s.send(JSON.stringify({ type: "invoke", req, cmd, args }));
+  });
+}
+
+async function refill() {
+  let newest;
+  for (const seq of messages.keys()) newest = newest === undefined ? seq : Math.max(newest, seq);
+  try {
+    let h = await invoke("room_history", newest === undefined ? {} : { since: newest });
+    if (h.epoch && epoch && h.epoch !== epoch) {
+      // The log was replaced: what is held is in its old numbering.
+      messages.clear();
+      h = await invoke("room_history", {});
+    }
+    epoch = h.epoch || epoch;
+    localPeer = h.localPeer;
+    $("room").textContent = "#" + h.room;
+    document.title = h.room + " · Phantom Room";
+    add(h.messages);
+  } catch { /* the next reconnect refills */ }
+}
+
+function add(list) {
+  for (const m of list) messages.set(m.seq, m);
+  render();
+}
+
+function who(p) { return p.peer + "/" + (p.agent === null || p.agent === undefined ? "human" : p.agent); }
+
+function render() {
+  const log = $("log");
+  const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 80;
+  const all = [...messages.values()].sort((a, b) => a.seq - b.seq).slice(-500);
+  log.replaceChildren();
+  if (all.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "empty";
+    empty.textContent = "Nobody has said anything yet. Mention an agent with @name to hand it work.";
+    log.append(empty);
+    return;
+  }
+  for (const m of all) log.append(bubble(m));
+  if (atBottom) log.scrollTop = log.scrollHeight;
+}
+
+function bubble(m) {
+  const at = new Date(m.ts).toLocaleString();
+  if (m.kind === "notice") {
+    const p = document.createElement("p");
+    p.className = "notice";
+    p.title = at;
+    p.textContent = m.from.peer + " · " + m.text;
+    return p;
+  }
+  const mine = (m.from.agent === null || m.from.agent === undefined) && m.from.peer === localPeer;
+  const div = document.createElement("div");
+  div.className = "msg" + (mine ? " mine" : "");
+  div.title = at;
+  if (!mine) {
+    const name = document.createElement("span");
+    name.className = "who";
+    name.textContent = who(m.from);
+    div.append(name);
+  }
+  const text = document.createElement("span");
+  text.className = "text";
+  text.textContent = m.text;
+  div.append(text);
+  if (m.refs && m.refs.length) {
+    const refs = document.createElement("span");
+    refs.className = "refs";
+    refs.textContent = "📎 " + m.refs.map(refLabel).join(" · ");
+    div.append(refs);
+  }
+  return div;
+}
+
+// "room/1790…-notes.md" is where the server keeps it; "notes.md" is what it is.
+function refLabel(r) {
+  if (r.kind !== "handoff") return "blob " + r.id.slice(0, 8);
+  return r.file.replace(/^room\/\d+-(\d+-)?/, "");
+}
+
+function stateOf(r) {
+  if (!r.running) return ["", "not running"];
+  switch (r.state) {
+    case "working": case "started": return ["busy", "working"];
+    case "attention": return ["wait", "waiting for someone"];
+    case "exited": return ["bad", "CLI exited"];
+    default: return ["ok", "idle"];
+  }
+}
+
+let rosterRound = 0;
+function pollRoster() {
+  clearTimeout(rosterTimer);
+  // Only the newest round schedules the next, so a poll started while one is
+  // in flight (right after a send) never leaves two loops running.
+  const round = ++rosterRound;
+  refreshRoster().finally(() => {
+    if (!socket || round !== rosterRound) return;
+    rosterTimer = setTimeout(pollRoster, Date.now() < fastUntil ? ROSTER_FAST_MS : ROSTER_EVERY_MS);
+  });
+}
+
+async function refreshRoster() {
+  let roster;
+  try { roster = await invoke("room_roster", {}); } catch { return; }
+  // Who is busy, and who is waiting on a person, in one line under the
+  // conversation — each name a way to see what that agent's screen shows.
+  const named = (states) => roster
+    .filter((r) => r.agent !== null && r.agent !== undefined && r.running && states.includes(r.state))
+    .map((r) => r.peer + "/" + r.agent);
+  const busy = named(["working", "started"]);
+  const waiting = named(["attention"]);
+  const line = $("busy");
+  line.replaceChildren();
+  const group = (icon, ids, tail) => {
+    if (!ids.length) return;
+    line.append(icon + " ");
+    ids.forEach((id, i) => {
+      if (i) line.append(", ");
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "peek";
+      b.title = "see what its screen shows";
+      b.textContent = id;
+      b.addEventListener("click", () => openScreen(id));
+      line.append(b);
+    });
+    line.append(tail);
+  };
+  group("⏳", busy, " working…  ");
+  group("❓", waiting, " waiting for someone");
+  line.hidden = busy.length === 0 && waiting.length === 0;
+  const chips = $("chips");
+  chips.replaceChildren();
+  for (const r of roster) {
+    if (r.agent === null || r.agent === undefined) continue;
+    const [kind, label] = stateOf(r);
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "chip";
+    chip.title = [r.role, r.peer === localPeer ? "on this machine" : "on " + r.peer, label].filter(Boolean).join(" · ");
+    const dot = document.createElement("span");
+    dot.className = "dot " + kind;
+    // One span for the name, so the chip's gap falls only after the dot.
+    const name = document.createElement("span");
+    const peer = document.createElement("span");
+    peer.className = "peer";
+    peer.textContent = r.peer + "/";
+    name.append(peer, document.createTextNode(r.agent));
+    chip.append(dot, name);
+    // A bare name means this machine's agent; anyone else's needs its peer.
+    const mention = "@" + (r.peer === localPeer ? r.agent : r.peer + "/" + r.agent) + " ";
+    chip.addEventListener("click", () => insert(mention));
+    chips.append(chip);
+  }
+}
+
+// A read-only look at one agent's screen, in place of the conversation.
+function openScreen(target) {
+  $("screen-title").textContent = target + "'s screen · read-only, refreshing";
+  $("screen-text").textContent = "…";
+  $("screen").hidden = false;
+  $("log").hidden = true;
+  const load = async () => {
+    try {
+      $("screen-text").textContent = (await invoke("room_peek", { target })) || "(nothing on screen)";
+    } catch (e) {
+      $("screen-text").textContent = e.message;
+    }
+  };
+  clearInterval(peekTimer);
+  load();
+  peekTimer = setInterval(load, PEEK_EVERY_MS);
+}
+
+function closeScreen() {
+  clearInterval(peekTimer);
+  peekTimer = null;
+  $("screen").hidden = true;
+  $("log").hidden = !socket;
+}
+
+function insert(mention) {
+  const t = $("text");
+  t.value = t.value + (t.value && !t.value.endsWith(" ") ? " " : "") + mention;
+  t.focus();
+  syncSend();
+}
+
+function syncSend() { $("send").disabled = !$("text").value.trim() && attached.length === 0; }
+
+function showError(text) {
+  $("send-error").textContent = text;
+  $("send-error").hidden = !text;
+}
+
+function renderAttached() {
+  const box = $("attached");
+  box.replaceChildren();
+  attached.forEach((a, i) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.title = "remove";
+    b.textContent = "📎 " + a.name + " ×";
+    b.addEventListener("click", () => { attached.splice(i, 1); renderAttached(); });
+    box.append(b);
+  });
+  syncSend();
+}
+
+async function addFiles(files) {
+  showError("");
+  for (const file of files) {
+    if (attached.length >= MAX_ATTACHMENTS) return showError("At most " + MAX_ATTACHMENTS + " attachments per message.");
+    if (file.size > MAX_ATTACHMENT_BYTES) return showError(file.name + " is over 64 KiB.");
+    const text = await file.text();
+    // A NUL is the tell of a binary file read as text.
+    if (text.includes("\0")) return showError(file.name + " is not a text file.");
+    attached.push({ name: file.name, text });
+  }
+  renderAttached();
+}
+
+async function send() {
+  const t = $("text");
+  let text = t.value.trim();
+  const attach = attached.slice();
+  // Too long for a message: send the whole of it as a file, and keep the
+  // opening as the message — that is where an @mention usually is, and a
+  // mention only routes from the message itself.
+  if (bytes(text) > MAX_MESSAGE_BYTES) {
+    attach.push({ name: "message.txt", text });
+    const first = text.split("\n")[0];
+    text = (first.length <= 400 ? first : text.slice(0, 200)) + " … (full text attached)";
+  }
+  if (!text && attach.length) text = "📎 " + attach.map((a) => a.name).join(", ");
+  if (!text) return;
+  if (attach.length > MAX_ATTACHMENTS) return showError("At most " + MAX_ATTACHMENTS + " attachments per message.");
+  $("send").disabled = true;
+  showError("");
+  try {
+    const msg = await invoke("room_post", { text, attach });
+    // Only once it landed: a failed post keeps the draft and its files.
+    t.value = "";
+    attached = [];
+    renderAttached();
+    if (msg) add([msg]);
+    if (text.includes("@")) {
+      fastUntil = Date.now() + FAST_FOR_MS;
+      setTimeout(pollRoster, 1000);
+    }
+  } catch (e) {
+    showError("Not sent: " + e.message);
+  }
+  syncSend();
+}
+
+$("gate").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const v = $("token").value.trim();
+  if (!v) return;
+  saved.set(v);
+  $("token").value = "";
+  connect();
+});
+$("screen-close").addEventListener("click", closeScreen);
+$("signout").addEventListener("click", () => {
+  closeScreen();
+  saved.clear();
+  const s = socket;
+  socket = null;
+  s?.close();
+  clearTimeout(rosterTimer);
+  $("busy").hidden = true;
+  messages.clear();
+  epoch = null;
+  $("chips").replaceChildren();
+  askForToken();
+});
+$("composer").addEventListener("submit", (e) => { e.preventDefault(); send(); });
+$("attach").addEventListener("click", () => $("files").click());
+$("files").addEventListener("change", (e) => {
+  addFiles([...e.target.files]);
+  e.target.value = ""; // choosing the same file again should still work
+});
+$("text").addEventListener("input", syncSend);
+$("text").addEventListener("keydown", (e) => {
+  // Enter sends; Shift+Enter is a new line; Enter while an IME is composing
+  // (Chinese, Japanese…) only confirms the composition.
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing && e.keyCode !== 229) {
+    e.preventDefault();
+    send();
+  }
+});
+
+connect();
+</script>
+</body>
+</html>
