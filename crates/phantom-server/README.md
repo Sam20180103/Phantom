@@ -249,9 +249,11 @@ Open it from the **Room** tab in the sidebar rail.
 
 ### Single machine
 
-Nothing is required — the room works out of the box with `main` as its name and
-`local` as the peer name. Add a `room:` block only to let agents post into it
-(see [Letting agents speak](#letting-agents-speak)).
+The sidebar Room opens with `main` as its name and `local` as its peer name.
+For a working Codex and Claude Code example, follow the
+[single-server setup](../../README.md#configure-one-server). It shows where to
+declare the CLI commands, configure the workspace, and give each agent its
+own token for replies.
 
 ### Across machines
 
