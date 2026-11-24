@@ -81,6 +81,10 @@ Codex to implement a change, then hand the result to Claude Code for review.
 Each agent runs in its own rmux terminal. Room shows agent status and delivers
 messages to the named agent. Agents can post updates and attach handoff files.
 
+<img src="docs/screenshots/room.png" alt="Phantom Room showing a Codex and Claude Code handoff, a linked review file, and a draft mention" width="400">
+
+*Room with example messages from a demo workspace.*
+
 ### Configure one server
 
 Install and sign in to each CLI on the server as the OS user running
