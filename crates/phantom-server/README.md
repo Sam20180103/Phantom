@@ -43,50 +43,98 @@ NO_PROXY=127.0.0.1,localhost,<your-brain-host> \
   ./target/release/phantom-server
 ```
 
-Then open `https://<host>:<port>` and log in with the code-server password.
+Open the configured address and sign in with the credentials described below.
 
 ### Configuration
 
-Read in order, later filling only unset fields:
-`$PHANTOM_CONFIG` → `~/.config/phantom/config.yaml` → `~/.config/code-server/config.yaml`.
+Phantom reads the file named by `PHANTOM_CONFIG`. When that variable is unset,
+it reads `$XDG_CONFIG_HOME/phantom/config.yaml`, with `~/.config` as the default
+configuration directory. An existing code-server config can fill unset fields.
 
-The format mirrors code-server's `config.yaml` — `bind-addr`, `password` (or
-`hashed-password`, an Argon2 PHC string, which wins), `cert`, `cert-key`. Point
-it at your existing code-server file and TLS + auth just work. Add
-`pty-backend: rmux` to keep terminals alive across reconnects (the whole point —
-detach on disconnect, reattach from any device).
+#### HTTPS with a custom login
 
-`username` is the one key code-server has no equivalent for. Set it and the
-login form requires a matching name as well as the password; leave it out and
-login is password-only, exactly as before. Both are compared in constant time.
+Create the configuration directory and generate a local certificate from the
+repository root. If you already have a certificate and private key, use those
+paths in the YAML.
 
-```yaml
-auth: password
-username: admin
-password: change-me
-cert: /home/you/.config/phantom/cert.pem
-cert-key: /home/you/.config/phantom/key.pem
-pty-backend: rmux
+```sh
+phantom_config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/phantom"
+mkdir -p "$phantom_config_dir"
+scripts/gen-phantom-cert.sh "$phantom_config_dir"
 ```
 
-Env overrides: `PHANTOM_USERNAME`, `PHANTOM_PASSWORD`, `PHANTOM_CERT`,
-`PHANTOM_CERT_KEY`.
+Save the following as `config.yaml` in that directory. Replace the example
+credentials and the certificate paths. The generator prints the actual paths.
+
+```yaml
+bind-addr: "127.0.0.1:8099"
+auth: password
+username: operator
+password: "replace-with-a-long-unique-password"
+cert: /home/you/.config/phantom/cert.pem
+cert-key: /home/you/.config/phantom/key.pem
+pty-backend: local
+```
+
+```sh
+chmod 600 "$phantom_config_dir/config.yaml"
+PHANTOM_CONFIG="$phantom_config_dir/config.yaml" ./target/release/phantom-server
+```
+
+With the certificate trusted by the client, open `https://localhost:8099`
+and sign in. For remote access, replace the loopback address with the IP of
+the intended server interface and visit a hostname or IP covered by the
+certificate. Use `pty-backend: rmux` if you have installed rmux and want
+terminal sessions to persist across reconnects.
+
+![Phantom browser sign-in form with username and password fields](../../docs/screenshots/sign-in.png)
+
+The login form requires the configured `username` and password. An omitted
+username gives password-only login unless inherited from code-server.
+Use an Argon2 PHC string in `hashed-password` to store a hash in YAML.
+Password precedence is `PHANTOM_PASSWORD`, then `hashed-password`, then
+`password`. The environment also accepts `PHANTOM_USERNAME`, `PHANTOM_CERT`,
+and `PHANTOM_CERT_KEY` as overrides.
+
+#### Reattach to a running CLI
+
+Set `pty-backend: rmux` and make sure `rmux` and your tools are on the server's
+`PATH`. Start a session on the server as the same OS user who runs
+`phantom-server`, using the same rmux socket and a name starting with
+`phantom-`.
+
+```sh
+cd /path/to/project
+rmux new-session -s phantom-project-codex
+codex
+```
+
+Detach with `Ctrl+b`, then `d` (the default rmux binding). Sign in to Phantom
+from your browser and select `project-codex` under **New tab > Reattach**.
+You can also run `codex` directly in a new Phantom terminal. Authenticate
+Codex on the server using its own sign-in flow.
 
 #### TLS certificate
 
-Serving `cert` + `cert-key` switches the server from HTTP to HTTPS. Reuse
-code-server's certificate if the box runs it; otherwise generate a self-signed
-one:
+Set both `cert` and `cert-key` to serve HTTPS. You can use a certificate and
+key issued for your domain, reuse a suitable code-server certificate, or
+generate one locally.
 
 ```bash
 scripts/gen-phantom-cert.sh            # writes cert.pem + key.pem to ~/.config/phantom
 ```
 
 The cert covers `localhost`, `127.0.0.1`, the host's global IPs (LAN and
-Tailscale), and the Tailscale MagicDNS name. A browser will warn once on the
-self-signed cert; accept it and the session sticks. HTTPS is also what unlocks
-the clipboard, notification, and service-worker APIs the UI uses (a secure
-context is required for all of them).
+Tailscale), and the Tailscale MagicDNS name. Configure clients to trust the
+self-signed certificate, or use a certificate issued by a trusted CA.
+For clients on multiple devices, see the CA option below. A trusted HTTPS
+connection also lets the UI use clipboard, notification, and service worker APIs.
+
+If the browser shows **Not Secure** at an `https://` address, inspect its
+certificate error. For a private CA, import only `ca.pem` into the client
+device's trusted root store. Check that the exact hostname or IP in the URL
+appears in the certificate's Subject Alternative Names. Reissue the certificate
+if that address is missing or the certificate has expired.
 
 #### A certificate authority for several machines
 
